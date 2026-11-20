@@ -39,7 +39,7 @@ App para o casal registrar os depósitos nas caixinhas e investimentos, acompanh
 ## 3. Funcionalidades
 
 ### MVP (versão 1)
-1. **Login** por link mágico no e-mail (sem senha), restrito aos 2 e-mails do casal.
+1. **Login** por e-mail + senha, restrito aos 2 e-mails do casal. *(Antes o plano era link mágico, mas no iPhone o link abre no Safari e não no PWA instalado.)*
 2. **Dashboard (tela inicial)**
    - Barra de progresso grande: `total juntos / R$ 100.000` e o percentual.
    - Card de cada pessoa: quanto já guardou e sua % de contribuição.
@@ -192,7 +192,7 @@ FinanceiroCasal/
 - [ ] Popular a meta inicial (R$ 100.000) e os destinos iniciais.
 
 ### Fase 3: Autenticação
-- [ ] Tela de login por link mágico.
+- [ ] Tela de login por e-mail + senha (usuários criados no painel do Supabase).
 - [ ] Proteção de rotas e criação do perfil no primeiro acesso.
 - [ ] Restringir aos 2 e-mails autorizados.
 
