@@ -13,10 +13,16 @@ function pick(env: Record<string, string>, names: string[]) {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const supabaseUrl = pick(env, ['VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL'])
+  let supabaseUrl = pick(env, ['VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL']).trim()
+  // aceita URL colada com caminho extra (ex.: https://xxx.supabase.co/rest/v1/) e usa só a origem
+  try {
+    if (supabaseUrl) supabaseUrl = new URL(supabaseUrl).origin
+  } catch {
+    console.warn(`\n⚠️  URL do Supabase inválida: "${supabaseUrl}"\n`)
+  }
   const supabaseKey = pick(env, [
-    'VITE_SUPABASE_ANON_KEY',
     'VITE_SUPABASE_PUBLISHABLE_KEY',
+    'VITE_SUPABASE_ANON_KEY',
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
     'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
     'SUPABASE_ANON_KEY',
