@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { Layout } from './components/Layout'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { DataProvider, useData } from './hooks/useData'
-import { isConfigured } from './lib/supabase'
+import { isConfigured, supabase } from './lib/supabase'
 import { Dashboard } from './pages/Dashboard'
 import { EntryForm } from './pages/EntryForm'
 import { History } from './pages/History'
@@ -16,7 +16,17 @@ function Centered({ children }: { children: React.ReactNode }) {
 function AuthedApp() {
   const { loading, error } = useData()
   if (loading) return <Centered>Carregando…</Centered>
-  if (error) return <Centered>Não foi possível carregar os dados: {error}</Centered>
+  if (error)
+    return (
+      <Centered>
+        <div>
+          <p>Não foi possível carregar os dados: {error}</p>
+          <button onClick={() => supabase.auth.signOut()} className="mt-4 rounded-xl border border-slate-300 bg-white px-4 py-2 text-slate-700">
+            Sair
+          </button>
+        </div>
+      </Centered>
+    )
   return (
     <Routes>
       <Route element={<Layout />}>

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { supabase } from '../lib/supabase'
+import { DB_SCHEMA, supabase } from '../lib/supabase'
 import type { Destination, Entry, Goal, Profile } from '../types'
 import { useAuth } from './useAuth'
 
@@ -26,13 +26,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [destinations, setDestinations] = useState<Destination[]>([])
   const [entries, setEntries] = useState<Entry[]>([])
 
+  const email = session?.user.email
+
   const reload = useCallback(async () => {
-    const [p, g, d, e] = await Promise.all([
+    let [p, g, d, e] = await Promise.all([
       supabase.from('profiles').select('id,name,color').order('created_at'),
       supabase.from('goals').select('id,title,target_amount').order('created_at').limit(1),
       supabase.from('destinations').select('id,name,kind').order('name'),
       supabase.from('entries').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
     ])
+
+    // primeiro login: cria o próprio perfil (não usamos gatilho em auth.users
+    // para não interferir em outros apps do mesmo projeto Supabase)
+    if (!p.error && userId && !p.data?.some((x) => x.id === userId)) {
+      const ins = await supabase
+        .from('profiles')
+        .upsert({ id: userId, name: (email ?? 'eu').split('@')[0] }, { onConflict: 'id', ignoreDuplicates: true })
+      if (ins.error) {
+        setError(
+          ins.error.code === '42501'
+            ? `O e-mail ${email} não tem acesso a este app. Ele precisa estar na tabela financeiro.allowed_emails.`
+            : ins.error.message,
+        )
+        setLoading(false)
+        return
+      }
+      p = await supabase.from('profiles').select('id,name,color').order('created_at')
+    }
+
     const err = p.error ?? g.error ?? d.error ?? e.error
     if (err) {
       setError(err.message)
@@ -44,14 +65,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setEntries((e.data ?? []).map((x) => ({ ...x, amount: Number(x.amount) })) as Entry[])
     }
     setLoading(false)
-  }, [])
+  }, [userId, email])
 
   useEffect(() => {
     if (!userId) return
     reload()
     const channel = supabase
       .channel('db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => reload())
+      .on('postgres_changes', { event: '*', schema: DB_SCHEMA }, () => reload())
       .subscribe()
     // ao voltar para o app (PWA em segundo plano), recarrega
     const onVisible = () => document.visibilityState === 'visible' && reload()

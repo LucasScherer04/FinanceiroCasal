@@ -9,16 +9,23 @@ Plano completo: [PLANO_DE_IMPLEMENTACAO.md](PLANO_DE_IMPLEMENTACAO.md).
 
 ## Configuração (uma vez só)
 
+> O app usa um esquema próprio no banco (`financeiro`), então pode ficar num projeto Supabase **que já tem outro app**, sem conflito: nada no esquema `public` nem nos gatilhos de `auth.users` é tocado.
+
 ### 1. Supabase: banco de dados
 1. Abra o projeto no Supabase → **SQL Editor** → **New query**.
 2. Cole o conteúdo de [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql).
-3. **Troque os 2 e-mails** na seção 7 do script pelos e-mails de vocês.
+3. **Troque os 2 e-mails** na seção 6 do script pelos e-mails de vocês.
 4. Clique em **Run**.
+5. **Project Settings → Data API → Exposed schemas**: adicione `financeiro` (mantenha os que já estão lá, como `public`) e salve.
 
 ### 2. Supabase: usuários
 1. **Authentication → Users → Add user → Create new user**.
 2. Crie um usuário para cada um (e-mail + senha), marcando **Auto Confirm User**.
-3. Em **Authentication → Sign In / Providers**, **desative "Allow new users to sign up"**, para ninguém mais conseguir se cadastrar.
+   Se algum de vocês já tem usuário no projeto (por causa do outro app), não precisa criar outro: é o mesmo login.
+3. O perfil de cada um é criado sozinho no primeiro login.
+
+> **Projeto compartilhado:** *não* desative "Allow new users to sign up" se o outro app precisar de cadastro. Não tem problema deixar ligado: quem não está na lista `financeiro.allowed_emails` até consegue logar, mas não vê nem grava nada (bloqueado pelo RLS).
+> **Projeto só deste app:** aí sim, desative em **Authentication → Sign In / Providers**.
 
 > Login é por e-mail + senha (e não por link mágico) porque, no iPhone, o link do e-mail abre no Safari e não no app instalado.
 
@@ -64,5 +71,5 @@ src/
   hooks/        useAuth (sessão) e useData (dados + tempo real)
   components/   Layout/abas, barra de progresso, item de lançamento, campo de valor
   pages/        Login, Dashboard, EntryForm, History, Settings
-supabase/migrations/001_init.sql   tabelas, RLS, realtime e dados iniciais
+supabase/migrations/001_init.sql   esquema "financeiro": tabelas, RLS, realtime e dados iniciais
 ```

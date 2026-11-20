@@ -66,6 +66,8 @@ App para o casal registrar os depósitos nas caixinhas e investimentos, acompanh
 
 ## 4. Modelo de dados (Supabase / Postgres)
 
+> **Implementado no esquema `financeiro`** (e não em `public`) para poder dividir um projeto Supabase com outro app. O perfil é criado pelo próprio app no primeiro login, sem gatilho em `auth.users`. O SQL real está em `supabase/migrations/001_init.sql`.
+
 ```sql
 -- Perfis (1 por usuário autenticado)
 create table profiles (
