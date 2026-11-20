@@ -4,7 +4,8 @@ import { MoneyInput } from '../components/MoneyInput'
 import { useData } from '../hooks/useData'
 import { todayISO } from '../lib/format'
 import { supabase } from '../lib/supabase'
-import { ENTRY_TYPE_LABEL, type EntryType } from '../types'
+import { hasAutoYield } from '../lib/yield'
+import { DESTINATION_ICON, ENTRY_TYPE_LABEL, rateLabel, type EntryType } from '../types'
 
 const TYPES: EntryType[] = ['deposito', 'rendimento', 'retirada']
 
@@ -24,8 +25,10 @@ export function EntryForm() {
 
   // caixinha que rende pelo CDI: rendimento é automático, então não oferecemos lançar à mão
   const selectedDest = destinations.find((d) => d.id === destinationId)
-  const autoYield = Boolean(selectedDest?.cdi_percent && selectedDest.cdi_percent > 0)
-  const types = autoYield && type !== 'rendimento' ? TYPES.filter((t) => t !== 'rendimento') : TYPES
+  const autoYield = selectedDest ? hasAutoYield(selectedDest) : false
+  const isFgts = selectedDest?.kind === 'fgts'
+  // FGTS mantém "Rendimento" para lançar a distribuição de lucros anual
+  const types = autoYield && !isFgts && type !== 'rendimento' ? TYPES.filter((t) => t !== 'rendimento') : TYPES
 
   if (id && !existing) {
     return <p className="p-6 text-center text-slate-500">Lançamento não encontrado.</p>
@@ -114,18 +117,19 @@ export function EntryForm() {
               <option value="">— Não informar —</option>
               {destinations.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.kind === 'caixinha' ? '🐷' : '📈'} {d.name}
-                  {d.cdi_percent ? ` · ${d.cdi_percent.toLocaleString('pt-BR')}% CDI` : ''}
+                  {DESTINATION_ICON[d.kind]} {d.name}
+                  {rateLabel(d) ? ` · ${rateLabel(d)}` : ''}
                 </option>
               ))}
             </select>
           )}
           {autoYield && (
             <p className="mt-1 text-xs text-emerald-700">
-              Rende {selectedDest!.cdi_percent!.toLocaleString('pt-BR')}% do CDI: o rendimento é calculado sozinho, todo dia.
+              Rende {rateLabel(selectedDest!)}: o rendimento é calculado sozinho, todo dia.
+              {isFgts && ' Use "Rendimento" só para a distribuição de lucros anual do FGTS.'}
             </p>
           )}
-          {autoYield && type === 'rendimento' && (
+          {autoYield && !isFgts && type === 'rendimento' && (
             <p className="mt-1 text-xs text-amber-700">
               Atenção: esta caixinha já rende automaticamente; lançar rendimento à mão vai contar em dobro.
             </p>

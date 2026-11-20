@@ -5,6 +5,7 @@ import { ProgressBar } from '../components/ProgressBar'
 import { useData } from '../hooks/useData'
 import { useYields } from '../hooks/useYields'
 import { formatBRL, formatDate, sumEntries } from '../lib/format'
+import { DESTINATION_ICON, rateLabel } from '../types'
 
 const pctFmt = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
 
@@ -82,10 +83,10 @@ export function Dashboard() {
               <div key={d.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                 <div className="min-w-0">
                   <p className="truncate">
-                    {d.kind === 'caixinha' ? '🐷' : '📈'} {d.name}
+                    {DESTINATION_ICON[d.kind]} {d.name}
                   </p>
-                  {d.cdi_percent ? (
-                    <p className="text-xs text-slate-500">{pctFmt(d.cdi_percent)}% do CDI</p>
+                  {rateLabel(d) ? (
+                    <p className="text-xs text-slate-500">{rateLabel(d)}</p>
                   ) : null}
                 </div>
                 <div className="shrink-0 text-right">

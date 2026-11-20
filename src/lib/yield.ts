@@ -2,7 +2,28 @@ import type { CdiRate } from './cdi'
 import { signedAmount } from './format'
 import type { Destination, Entry } from '../types'
 
-export const bucketKey = (userId: string, destinationId: string) => `${userId}|${destinationId}`
+/** O destino rende sozinho (CDI ou taxa fixa)? */
+export const hasAutoYield = (d: Pick<Destination, 'cdi_percent' | 'annual_rate'>) =>
+  Boolean((d.cdi_percent && d.cdi_percent > 0) || (d.annual_rate && d.annual_rate > 0))
+
+/**
+ * Rendimento de um dia útil, dado o CDI do dia (em %).
+ * - % do CDI: CDI do dia × percentual (ex.: 110% do CDI)
+ * - taxa fixa ao ano (ex.: FGTS 3% a.a.): (1 + taxa)^(1/252) − 1, todo dia útil
+ */
+function dailyGrowth(d: Destination): ((cdiDayPct: number) => number) | null {
+  if (d.cdi_percent && d.cdi_percent > 0) {
+    const p = d.cdi_percent / 100
+    return (cdi) => (cdi / 100) * p
+  }
+  if (d.annual_rate && d.annual_rate > 0) {
+    const daily = Math.pow(1 + d.annual_rate / 100, 1 / 252) - 1
+    return () => daily
+  }
+  return null
+}
+
+export const bucketKey =(userId: string, destinationId: string) => `${userId}|${destinationId}`
 
 /**
  * Rendimento estimado (bruto, antes de IR) de cada "pote" pessoa × caixinha.
@@ -16,8 +37,8 @@ export function computeYields(entries: Entry[], destinations: Destination[], rat
   if (rates.length === 0) return result
 
   for (const dest of destinations) {
-    const pct = dest.cdi_percent
-    if (!pct || pct <= 0) continue
+    const growth = dailyGrowth(dest)
+    if (!growth) continue
 
     const byUser = new Map<string, Entry[]>()
     for (const e of entries) {
@@ -38,7 +59,7 @@ export function computeYields(entries: Entry[], destinations: Destination[], rat
           i++
         }
         if (i === 0) continue // ainda não tinha dinheiro nesse dia
-        balance *= 1 + (ratePct / 100) * (pct / 100)
+        balance *= 1 + growth(ratePct)
       }
       result.set(bucketKey(userId, dest.id), balance - principal)
     }

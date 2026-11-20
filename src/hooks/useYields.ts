@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { annualFromDaily, getCdiRates, type CdiRate } from '../lib/cdi'
-import { computeYields } from '../lib/yield'
+import { computeYields, hasAutoYield } from '../lib/yield'
 import { useData } from './useData'
 
 export type CdiStatus = 'idle' | 'loading' | 'ok' | 'error'
@@ -13,7 +13,8 @@ export function useYields() {
 
   // data do lançamento mais antigo em caixinha que rende pelo CDI
   const from = useMemo(() => {
-    const cdiDest = new Set(destinations.filter((d) => d.cdi_percent && d.cdi_percent > 0).map((d) => d.id))
+    // o calendário de dias úteis vem da série do CDI, então serve também para taxa fixa (FGTS)
+    const cdiDest = new Set(destinations.filter(hasAutoYield).map((d) => d.id))
     let min: string | null = null
     for (const e of entries) {
       if (e.destination_id && cdiDest.has(e.destination_id) && (!min || e.date < min)) min = e.date

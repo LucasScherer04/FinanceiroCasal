@@ -16,7 +16,7 @@ Plano completo: [PLANO_DE_IMPLEMENTACAO.md](PLANO_DE_IMPLEMENTACAO.md).
 2. Cole o conteúdo de [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql).
 3. **Troque os 2 e-mails** na seção 6 do script pelos e-mails de vocês.
 4. Clique em **Run**.
-5. Numa nova query, rode também [`002_cdi_percent.sql`](supabase/migrations/002_cdi_percent.sql) (rendimento pelo CDI). Sempre que surgir um arquivo novo em `supabase/migrations/`, rode-o do mesmo jeito.
+5. Numa nova query, rode também [`002_cdi_percent.sql`](supabase/migrations/002_cdi_percent.sql) (rendimento pelo CDI) e depois [`003_fgts_taxa_fixa.sql`](supabase/migrations/003_fgts_taxa_fixa.sql) (FGTS e taxa fixa). Sempre que surgir um arquivo novo em `supabase/migrations/`, rode-o do mesmo jeito.
 6. **Project Settings → Data API → Exposed schemas**: adicione `financeiro` (mantenha os que já estão lá, como `public`) e salve.
 
 ### 2. Supabase: usuários
@@ -59,6 +59,7 @@ Plano completo: [PLANO_DE_IMPLEMENTACAO.md](PLANO_DE_IMPLEMENTACAO.md).
 - O app busca a taxa diária do CDI na API pública do Banco Central (série SGS 12), guarda no aparelho e só busca os dias novos.
 - O saldo de cada pessoa em cada caixinha é corrigido dia útil a dia útil: `saldo × (1 + CDI do dia × %CDI)`. Depósitos e retiradas entram na data em que foram feitos.
 - É uma **estimativa bruta** (antes do IR e sem IOF). Pode diferir alguns centavos do banco.
+- **FGTS** (e qualquer destino com **taxa fixa ao ano**): rende `(1 + taxa)^(1/252) − 1` por dia útil. O padrão do FGTS é 3% a.a.; a TR pode ser incluída aumentando a taxa. Para o FGTS, o tipo **Rendimento** fica disponível para lançar a distribuição de lucros anual.
 - O tipo **Rendimento** continua existindo para lançar à mão o que não rende pelo CDI (ex.: ações, FIIs).
 
 ## Rodar localmente (opcional)

@@ -16,6 +16,19 @@ interface DataState {
 
 const DataContext = createContext<DataState | null>(null)
 
+const toNum = (v: unknown) => (v == null ? null : Number(v))
+
+/** Busca destinos tolerando banco sem as migrations 002/003 (coluna inexistente = 42703). */
+async function loadDestinations() {
+  const attempts = ['id,name,kind,cdi_percent,annual_rate', 'id,name,kind,cdi_percent', 'id,name,kind']
+  let res = await supabase.from('destinations').select(attempts[0]).order('name')
+  for (const cols of attempts.slice(1)) {
+    if (res.error?.code !== '42703') break
+    res = await supabase.from('destinations').select(cols).order('name')
+  }
+  return res
+}
+
 export function DataProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth()
   const userId = session?.user.id
@@ -32,15 +45,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let [p, g, d, e] = await Promise.all([
       supabase.from('profiles').select('id,name,color').order('created_at'),
       supabase.from('goals').select('id,title,target_amount').order('created_at').limit(1),
-      supabase.from('destinations').select('id,name,kind,cdi_percent').order('name'),
+      loadDestinations(),
       supabase.from('entries').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
     ])
-
-    // banco ainda sem a coluna cdi_percent (migration 002 não rodada): segue sem rendimento automático
-    if (d.error?.code === '42703') {
-      const fallback = await supabase.from('destinations').select('id,name,kind').order('name')
-      d = { ...fallback, data: (fallback.data ?? []).map((x) => ({ ...x, cdi_percent: null })) } as typeof d
-    }
 
     // primeiro login: cria o próprio perfil (não usamos gatilho em auth.users
     // para não interferir em outros apps do mesmo projeto Supabase)
@@ -68,7 +75,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setProfiles(p.data ?? [])
       setGoal(g.data?.[0] ? { ...g.data[0], target_amount: Number(g.data[0].target_amount) } : null)
       setDestinations(
-        (d.data ?? []).map((x) => ({ ...x, cdi_percent: x.cdi_percent == null ? null : Number(x.cdi_percent) })) as Destination[],
+        ((d.data ?? []) as unknown as Record<string, unknown>[]).map((x) => ({
+          id: String(x.id),
+          name: String(x.name),
+          kind: x.kind as Destination['kind'],
+          cdi_percent: toNum(x.cdi_percent),
+          annual_rate: toNum(x.annual_rate),
+        })),
       )
       setEntries((e.data ?? []).map((x) => ({ ...x, amount: Number(x.amount) })) as Entry[])
     }
