@@ -17,6 +17,8 @@ export interface Destination {
   id: string
   name: string
   kind: DestinationKind
+  /** % do CDI (100 = 100% do CDI). null = não rende pelo CDI */
+  cdi_percent: number | null
 }
 
 export interface Entry {

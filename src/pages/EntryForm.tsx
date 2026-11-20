@@ -22,6 +22,11 @@ export function EntryForm() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // caixinha que rende pelo CDI: rendimento é automático, então não oferecemos lançar à mão
+  const selectedDest = destinations.find((d) => d.id === destinationId)
+  const autoYield = Boolean(selectedDest?.cdi_percent && selectedDest.cdi_percent > 0)
+  const types = autoYield && type !== 'rendimento' ? TYPES.filter((t) => t !== 'rendimento') : TYPES
+
   if (id && !existing) {
     return <p className="p-6 text-center text-slate-500">Lançamento não encontrado.</p>
   }
@@ -76,8 +81,8 @@ export function EntryForm() {
         <span className="w-16" />
       </div>
 
-      <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-200 p-1">
-        {TYPES.map((t) => (
+      <div className={`grid gap-1 rounded-xl bg-slate-200 p-1 ${types.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {types.map((t) => (
           <button
             key={t}
             type="button"
@@ -110,9 +115,20 @@ export function EntryForm() {
               {destinations.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.kind === 'caixinha' ? '🐷' : '📈'} {d.name}
+                  {d.cdi_percent ? ` · ${d.cdi_percent.toLocaleString('pt-BR')}% CDI` : ''}
                 </option>
               ))}
             </select>
+          )}
+          {autoYield && (
+            <p className="mt-1 text-xs text-emerald-700">
+              Rende {selectedDest!.cdi_percent!.toLocaleString('pt-BR')}% do CDI: o rendimento é calculado sozinho, todo dia.
+            </p>
+          )}
+          {autoYield && type === 'rendimento' && (
+            <p className="mt-1 text-xs text-amber-700">
+              Atenção: esta caixinha já rende automaticamente; lançar rendimento à mão vai contar em dobro.
+            </p>
           )}
         </label>
         <label className="block">

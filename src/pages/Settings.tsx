@@ -10,6 +10,29 @@ const card = 'mb-4 rounded-2xl bg-white p-4 shadow-sm'
 const input = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2'
 const btn = 'rounded-lg bg-brand px-4 py-2 font-medium text-white active:bg-brand-dark disabled:opacity-60'
 
+/** '' -> null (sem CDI); número válido -> número; inválido -> undefined */
+function parseCdi(raw: string): number | null | undefined {
+  const s = raw.trim().replace('%', '').replace(',', '.')
+  if (!s) return null
+  const n = Number(s)
+  return Number.isFinite(n) && n >= 0 && n <= 1000 ? n : undefined
+}
+
+function CdiInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex flex-1 items-center rounded-lg border border-slate-300 bg-white pr-3">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        inputMode="decimal"
+        placeholder="% do CDI"
+        className="w-full rounded-lg bg-transparent px-3 py-2 outline-none"
+      />
+      <span className="shrink-0 text-sm text-slate-500">% do CDI</span>
+    </div>
+  )
+}
+
 export function Settings() {
   const { me, goal, destinations, entries, reload } = useData()
   const [msg, setMsg] = useState<string | null>(null)
@@ -37,6 +60,9 @@ export function Settings() {
   // destinos
   const [destName, setDestName] = useState('')
   const [destKind, setDestKind] = useState<DestinationKind>('caixinha')
+  const [destCdi, setDestCdi] = useState('100')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editCdi, setEditCdi] = useState('')
 
   async function run(promise: PromiseLike<{ error: { message: string } | null }>, ok: string) {
     const { error } = await promise
@@ -60,8 +86,20 @@ export function Settings() {
   function addDestination(e: FormEvent) {
     e.preventDefault()
     if (!destName.trim()) return
-    run(supabase.from('destinations').insert({ name: destName.trim(), kind: destKind }), 'Destino adicionado!')
+    const cdi = parseCdi(destCdi)
+    if (cdi === undefined) return setMsg('% do CDI inválido. Use um número, ex.: 100 ou 110,5 (ou deixe vazio).')
+    run(
+      supabase.from('destinations').insert({ name: destName.trim(), kind: destKind, cdi_percent: cdi }),
+      'Destino adicionado!',
+    )
     setDestName('')
+  }
+
+  function saveCdi(id: string) {
+    const cdi = parseCdi(editCdi)
+    if (cdi === undefined) return setMsg('% do CDI inválido.')
+    run(supabase.from('destinations').update({ cdi_percent: cdi }).eq('id', id), 'Rendimento atualizado!')
+    setEditingId(null)
   }
 
   function removeDestination(id: string, label: string) {
@@ -109,25 +147,53 @@ export function Settings() {
       <section className={card}>
         <h2 className="mb-3 font-semibold">Caixinhas e investimentos</h2>
         {destinations.length === 0 && <p className="mb-2 text-sm text-slate-500">Nenhum cadastrado.</p>}
-        <ul className="mb-3 divide-y divide-slate-100">
+        <ul className="mb-4 divide-y divide-slate-100">
           {destinations.map((d) => (
-            <li key={d.id} className="flex items-center justify-between py-2">
-              <span>{d.kind === 'caixinha' ? '🐷' : '📈'} {d.name}</span>
-              <button type="button" onClick={() => removeDestination(d.id, d.name)} className="text-sm text-rose-600">
-                Remover
-              </button>
+            <li key={d.id} className="py-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate">{d.kind === 'caixinha' ? '🐷' : '📈'} {d.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {d.cdi_percent ? `${d.cdi_percent.toLocaleString('pt-BR')}% do CDI · rendimento automático` : 'Sem CDI · rendimento manual'}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-3 text-sm">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingId(editingId === d.id ? null : d.id)
+                      setEditCdi(d.cdi_percent ? String(d.cdi_percent).replace('.', ',') : '')
+                    }}
+                    className="text-brand"
+                  >
+                    % CDI
+                  </button>
+                  <button type="button" onClick={() => removeDestination(d.id, d.name)} className="text-rose-600">
+                    Remover
+                  </button>
+                </div>
+              </div>
+              {editingId === d.id && (
+                <div className="mt-2 flex items-center gap-2">
+                  <CdiInput value={editCdi} onChange={setEditCdi} />
+                  <button type="button" onClick={() => saveCdi(d.id)} className={btn}>Salvar</button>
+                </div>
+              )}
             </li>
           ))}
         </ul>
-        <form onSubmit={addDestination} className="space-y-2">
+        <form onSubmit={addDestination} className="space-y-2 rounded-xl bg-slate-50 p-3">
+          <p className="text-sm font-medium">Nova caixinha / investimento</p>
           <input value={destName} onChange={(e) => setDestName(e.target.value)} className={input} placeholder="Ex.: Caixinha Nubank" />
-          <div className="flex gap-2">
-            <select value={destKind} onChange={(e) => setDestKind(e.target.value as DestinationKind)} className={input}>
-              <option value="caixinha">🐷 Caixinha</option>
-              <option value="investimento">📈 Investimento</option>
-            </select>
-            <button className={btn}>Adicionar</button>
-          </div>
+          <select value={destKind} onChange={(e) => setDestKind(e.target.value as DestinationKind)} className={input}>
+            <option value="caixinha">🐷 Caixinha</option>
+            <option value="investimento">📈 Investimento</option>
+          </select>
+          <CdiInput value={destCdi} onChange={setDestCdi} />
+          <p className="text-xs text-slate-500">
+            Ex.: Caixinha Nubank = 100, CDB 110% = 110. Deixe vazio se não rende pelo CDI (ex.: ações). Aí o rendimento é lançado à mão.
+          </p>
+          <button className={`${btn} w-full`}>Adicionar</button>
         </form>
       </section>
 

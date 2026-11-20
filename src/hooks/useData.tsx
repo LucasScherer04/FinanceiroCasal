@@ -32,9 +32,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let [p, g, d, e] = await Promise.all([
       supabase.from('profiles').select('id,name,color').order('created_at'),
       supabase.from('goals').select('id,title,target_amount').order('created_at').limit(1),
-      supabase.from('destinations').select('id,name,kind').order('name'),
+      supabase.from('destinations').select('id,name,kind,cdi_percent').order('name'),
       supabase.from('entries').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
     ])
+
+    // banco ainda sem a coluna cdi_percent (migration 002 não rodada): segue sem rendimento automático
+    if (d.error?.code === '42703') {
+      const fallback = await supabase.from('destinations').select('id,name,kind').order('name')
+      d = { ...fallback, data: (fallback.data ?? []).map((x) => ({ ...x, cdi_percent: null })) } as typeof d
+    }
 
     // primeiro login: cria o próprio perfil (não usamos gatilho em auth.users
     // para não interferir em outros apps do mesmo projeto Supabase)
@@ -61,7 +67,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setError(null)
       setProfiles(p.data ?? [])
       setGoal(g.data?.[0] ? { ...g.data[0], target_amount: Number(g.data[0].target_amount) } : null)
-      setDestinations((d.data ?? []) as Destination[])
+      setDestinations(
+        (d.data ?? []).map((x) => ({ ...x, cdi_percent: x.cdi_percent == null ? null : Number(x.cdi_percent) })) as Destination[],
+      )
       setEntries((e.data ?? []).map((x) => ({ ...x, amount: Number(x.amount) })) as Entry[])
     }
     setLoading(false)

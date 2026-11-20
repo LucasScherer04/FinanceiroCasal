@@ -1,33 +1,55 @@
 import { Link } from 'react-router'
 import { EntryItem } from '../components/EntryItem'
+import { Logo } from '../components/Logo'
 import { ProgressBar } from '../components/ProgressBar'
 import { useData } from '../hooks/useData'
-import { formatBRL, sumEntries } from '../lib/format'
+import { useYields } from '../hooks/useYields'
+import { formatBRL, formatDate, sumEntries } from '../lib/format'
+
+const pctFmt = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
 
 export function Dashboard() {
   const { goal, profiles, entries, destinations, me } = useData()
+  const y = useYields()
   const target = goal?.target_amount ?? 100000
-  const total = sumEntries(entries)
+  const total = sumEntries(entries) + y.total
   const pct = Math.max(0, (total / target) * 100)
   const remaining = Math.max(0, target - total)
 
-  const perPerson = profiles.map((p) => ({
-    profile: p,
-    value: sumEntries(entries.filter((e) => e.user_id === p.id)),
-  }))
+  const perPerson = profiles.map((p) => {
+    const yieldValue = y.byUser(p.id)
+    return {
+      profile: p,
+      yieldValue,
+      value: sumEntries(entries.filter((e) => e.user_id === p.id)) + yieldValue,
+    }
+  })
 
   const perDestination = destinations
-    .map((d) => ({ d, value: sumEntries(entries.filter((e) => e.destination_id === d.id)) }))
-    .filter((x) => x.value !== 0)
+    .map((d) => {
+      const yieldValue = y.byDest(d.id)
+      return { d, yieldValue, value: sumEntries(entries.filter((e) => e.destination_id === d.id)) + yieldValue }
+    })
+    .filter((x) => Math.abs(x.value) >= 0.005)
     .sort((a, b) => b.value - a.value)
 
   return (
     <div>
       <header className="pt-safe rounded-b-3xl bg-gradient-to-br from-emerald-600 to-teal-700 px-5 pb-6 text-white">
-        <p className="pt-5 text-sm opacity-80">🏠 {goal?.title ?? 'Nosso apartamento'}</p>
-        <p className="mt-1 text-4xl font-bold tabular-nums">{formatBRL(total)}</p>
-        <p className="mb-4 text-sm opacity-80">de {formatBRL(target)}</p>
-        <ProgressBar target={target} parts={perPerson} />
+        <div className="flex items-center gap-2 pt-5">
+          <Logo className="h-8 w-8 drop-shadow" />
+          <p className="text-sm font-medium opacity-90">{goal?.title ?? 'Nosso apartamento'}</p>
+        </div>
+        <p className="mt-3 text-4xl font-bold tabular-nums">{formatBRL(total)}</p>
+        <p className="text-sm opacity-80">de {formatBRL(target)}</p>
+        {y.total > 0.005 && (
+          <p className="mt-1 inline-block rounded-full bg-white/15 px-2.5 py-0.5 text-xs">
+            📈 +{formatBRL(y.total)} de rendimento
+          </p>
+        )}
+        <div className="mt-4">
+          <ProgressBar target={target} parts={perPerson} />
+        </div>
         <div className="mt-2 flex justify-between text-sm">
           <span className="font-semibold">{pct.toFixed(1).replace('.', ',')}%</span>
           <span className="opacity-90">
@@ -37,7 +59,7 @@ export function Dashboard() {
       </header>
 
       <section className="grid grid-cols-2 gap-3 px-4 pt-4">
-        {perPerson.map(({ profile, value }) => (
+        {perPerson.map(({ profile, value, yieldValue }) => (
           <div key={profile.id} className="rounded-2xl bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2">
               <span className="h-3 w-3 rounded-full" style={{ background: profile.color }} />
@@ -46,6 +68,7 @@ export function Dashboard() {
             <p className="mt-2 text-lg font-bold tabular-nums">{formatBRL(value)}</p>
             <p className="text-xs text-slate-500">
               {total > 0 ? Math.round((value / total) * 100) : 0}% do total
+              {yieldValue > 0.005 && <span className="text-emerald-600"> · +{formatBRL(yieldValue)}</span>}
             </p>
           </div>
         ))}
@@ -54,14 +77,26 @@ export function Dashboard() {
       {perDestination.length > 0 && (
         <section className="mx-4 mt-4 rounded-2xl bg-white p-4 shadow-sm">
           <h2 className="mb-2 font-semibold">Onde está o dinheiro</h2>
-          {perDestination.map(({ d, value }) => (
-            <div key={d.id} className="flex justify-between py-1 text-sm">
-              <span>
-                {d.kind === 'caixinha' ? '🐷' : '📈'} {d.name}
-              </span>
-              <span className="font-medium tabular-nums">{formatBRL(value)}</span>
-            </div>
-          ))}
+          <div className="divide-y divide-slate-100">
+            {perDestination.map(({ d, value, yieldValue }) => (
+              <div key={d.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate">
+                    {d.kind === 'caixinha' ? '🐷' : '📈'} {d.name}
+                  </p>
+                  {d.cdi_percent ? (
+                    <p className="text-xs text-slate-500">{pctFmt(d.cdi_percent)}% do CDI</p>
+                  ) : null}
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-medium tabular-nums">{formatBRL(value)}</p>
+                  {yieldValue > 0.005 && (
+                    <p className="text-xs text-emerald-600 tabular-nums">+{formatBRL(yieldValue)}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 
@@ -86,6 +121,14 @@ export function Dashboard() {
           </div>
         )}
       </section>
+
+      <p className="mx-6 mt-4 text-center text-xs text-slate-400">
+        {y.status === 'loading' && 'Atualizando CDI…'}
+        {y.status === 'error' && 'Não foi possível buscar o CDI agora; o rendimento será atualizado depois.'}
+        {y.status === 'ok' &&
+          y.cdiAnnual != null &&
+          `Rendimento estimado, bruto (antes do IR). CDI ${pctFmt(y.cdiAnnual)}% a.a. · atualizado até ${y.lastRateDate ? formatDate(y.lastRateDate) : '—'}.`}
+      </p>
 
       <Link
         to="/novo"
